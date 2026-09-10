@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratório - Registro Pedagógico</title>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --danger: #dc2626;
+            --success: #16a34a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text-main); padding: 20px 10px; }
+        .container { max-width: 1250px; margin: 0 auto; }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: #fff;
+        }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: background 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-sm { padding: 4px 8px; font-size: 0.78rem; }
+        .btn-block { width: 100%; }
+
+        /* Grid de Checklist das 12 Normas */
+        .grid-normas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 10px 0; }
+        .item-norma {
+            background: #f8fafc; border: 1px solid var(--border); padding: 8px; border-radius: 6px;
+            font-size: 0.82rem; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+        }
+        .item-norma input { width: auto; cursor: pointer; }
+
+        /* Tabela Pedagógica */
+        .table-responsive { overflow-x: auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: center; }
+        th, td { padding: 8px 5px; border: 1px solid var(--border); white-space: nowrap; }
+        th { background: #f1f5f9; color: var(--text-main); font-weight: 600; }
+        td.left { text-align: left; }
+        .badge-aluno { background: #e0f2fe; color: #0369a1; font-family: monospace; font-weight: bold; padding: 2px 6px; border-radius: 4px; }
+        .flag-1 { background: #fee2e2; color: #991b1b; font-weight: bold; border-radius: 3px; display: inline-block; width: 20px; }
+        .flag-0 { color: #cbd5e1; }
+
+        /* Modal e Toast */
+        .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .hidden { display: none !important; }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 6px; color: white; font-size: 0.9rem; z-index: 2000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- SEÇÃO DE AUTENTICAÇÃO -->
+    <div id="authSection" class="card" style="max-width: 380px; margin: 80px auto;">
+        <h2 id="authTitle" style="margin-bottom: 15px;">🔐 Acesso Docente</h2>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="email" placeholder="professor@escola.com">
+        </div>
+        <div class="form-group">
+            <label>Senha</label>
+            <input type="password" id="senha" placeholder="Mínimo 6 caracteres">
+        </div>
+        <button class="btn btn-primary btn-block" id="btnAuth" onclick="executarAuth()">Entrar</button>
+        <p style="text-align: center; margin-top: 15px; font-size: 0.85rem;">
+            <a href="javascript:void(0)" onclick="toggleModoAuth()" id="linkAuth" style="color: var(--primary); text-decoration: none;">Não tem conta? Cadastre-se</a>
+        </p>
+    </div>
+
+    <!-- SEÇÃO PRINCIPAL (SÓ APARECE LOGADO) -->
+    <div id="mainSection" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <h2>📋 Gestão de Laboratório & Ocorrências</h2>
+                <span id="userBadge" style="font-size: 0.85rem; color: var(--text-muted);"></span>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="sair()">🚪 Sair</button>
+        </div>
+
+        <!-- BARRA DE SELEÇÃO DE TURMAS E AÇÕES -->
+        <div class="card" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 15px;">
+            <div style="flex: 1; min-width: 250px;">
+                <label style="font-weight: 600; font-size: 0.85rem;">Selecione a Turma / Disciplina:</label>
+                <select id="selTurma" onchange="trocarTurma()" style="margin-top: 5px;">
+                    <option value="">Carregando turmas...</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary btn-sm" onclick="abrirModal('modalTurma')">➕ Nova Turma</button>
+                <button class="btn btn-primary btn-sm" onclick="abrirModal('modalAluno')">➕ Cadastrar Aluno</button>
+            </div>
+        </div>
+
+        <!-- FORMULÁRIO DE LANÇAMENTO DA AULA -->
+        <div class="card">
+            <h3>📝 Registrar Ocorrência da Aula</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">
+                Critério de registro objetivo: Fato observável associado a uma norma (0 = não ocorreu | 1 = ocorreu).
+            </p>
+
+            <form id="formOcorrencia">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="form-group">
+                        <label>Data *</label>
+                        <input type="date" id="dataOcorrencia" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Aluno (Código / Pseudônimo) *</label>
+                        <select id="selAluno" required>
+                            <option value="">Selecione a turma primeiro...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label style="font-weight: 600; font-size: 0.85rem;">Marque as violações observadas:</label>
+                <div class="grid-normas">
+                    <label class="item-norma"><input type="checkbox" id="chk_atraso"> Atraso</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_falta"> Falta</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_saida"> Saída indevida</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_conversa"> Conversa</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_celular"> Celular</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_notebook"> Notebook</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_alim"> Alimentação</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_n_real"> Não realizou</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_n_entreg"> Não entregou</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_dormiu"> Dormiu</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_equip"> Equipamento</label>
+                    <label class="item-norma"><input type="checkbox" id="chk_desrespeito"> Desrespeito</label>
+                </div>
+
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>Observação Contextual</label>
+                    <textarea id="obsOcorrencia" rows="2" placeholder="Ex: Utilizou notebook para jogos durante explanação inicial."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Salvar Lançamento</button>
+            </form>
+        </div>
+
+        <!-- TABELA DE OCORRÊNCIAS -->
+        <div class="card">
+            <h3>📊 Planilha de Acompanhamento Neutro</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Código</th>
+                            <th>Aluno</th>
+                            <th>Atraso</th>
+                            <th>Falta</th>
+                            <th>Saída</th>
+                            <th>Conv.</th>
+                            <th>Cel.</th>
+                            <th>Note.</th>
+                            <th>Alim.</th>
+                            <th>N. Real.</th>
+                            <th>N. Entr.</th>
+                            <th>Dorm.</th>
+                            <th>Equip.</th>
+                            <th>Desr.</th>
+                            <th>Observação</th>
+                            <th>Excluir</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listaOcorrencias">
+                        <tr><td colspan="17" style="color: var(--text-muted); padding: 15px;">Nenhum registro carregado.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CADASTRAR TURMA -->
+<div id="modalTurma" class="modal hidden">
+    <div class="modal-content">
+        <h3>➕ Nova Turma</h3>
+        <form id="formTurma" style="margin-top: 15px;">
+            <div class="form-group">
+                <label>Código da Turma</label>
+                <input type="text" id="turmaCodigo" placeholder="Ex: JFA241GNTDS" required>
+            </div>
+            <div class="form-group">
+                <label>Disciplina / Laboratório</label>
+                <input type="text" id="turmaDisciplina" placeholder="Ex: Banco de Dados" required>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px;">
+                <button type="button" class="btn btn-sm" onclick="fecharModal('modalTurma')">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm">Salvar Turma</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL CADASTRAR ALUNO (LGPD COM TABELA SEPARADA) -->
+<div id="modalAluno" class="modal hidden">
+    <div class="modal-content">
+        <h3>➕ Novo Aluno (Pseudonimização LGPD)</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+            O nome completo fica blindado em tabela restrita.
+        </p>
+        <form id="formAluno">
+            <div class="form-group">
+                <label>Código Pseudônimo</label>
+                <input type="text" id="alunoCod" placeholder="Ex: ALU-0427" required>
+            </div>
+            <div class="form-group">
+                <label>Nome Curto / Exibição</label>
+                <input type="text" id="alunoExibicao" placeholder="Ex: J. Silva" required>
+            </div>
+            <div class="form-group">
+                <label>Nome Completo (Identificador Seguro)</label>
+                <input type="text" id="alunoCompleto" placeholder="Ex: João da Silva Sauro" required>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px;">
+                <button type="button" class="btn btn-sm" onclick="fecharModal('modalAluno')">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm">Salvar Aluno</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<!-- SUPABASE SDK VIA ES MODULES -->
+<script type="importmap">
+{
+    "imports": {
+        "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+    }
+}
+</script>
+
+<script type="module">
+    import { createClient } from '@supabase/supabase-js';
+
+    // ============================================================
+    // SUAS CREDENCIAIS CONFIGURADAS
+    // ============================================================
+    const SUPABASE_URL = 'https://vsgvvhaanifwjdjuzwtv.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_CzhRPVakcyiIUF7hte5YPQ__Gj4631D';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let usuarioLogado = null;
+    let modoCadastro = false;
+    let turmas = [];
+
+    // --- AUTENTICAÇÃO ---
+    window.toggleModoAuth = () => {
+        modoCadastro = !modoCadastro;
+        document.getElementById('authTitle').innerText = modoCadastro ? '📝 Cadastro Docente' : '🔐 Acesso Docente';
+        document.getElementById('btnAuth').innerText = modoCadastro ? 'Cadastrar' : 'Entrar';
+        document.getElementById('linkAuth').innerText = modoCadastro ? 'Já tem conta? Faça login' : 'Não tem conta? Cadastre-se';
+    };
+
+    window.executarAuth = async () => {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('senha').value;
+        const btn = document.getElementById('btnAuth');
+
+        if (!email || password.length < 6) return alertToast('Preencha email e senha (mínimo 6 dígitos)', 'error');
+
+        btn.disabled = true;
+        btn.innerText = 'Processando...';
+
+        try {
+            if (modoCadastro) {
+                const { error } = await supabase.auth.signUp({ email, password });
+                if (error) throw error;
+                alertToast('Cadastro realizado! Faça login.', 'success');
+                window.toggleModoAuth();
+            } else {
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                inicializarApp(data.user);
+            }
+        } catch (err) {
+            alertToast(err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerText = modoCadastro ? 'Cadastrar' : 'Entrar';
+        }
+    };
+
+    window.sair = async () => {
+        await supabase.auth.signOut();
+        usuarioLogado = null;
+        document.getElementById('authSection').classList.remove('hidden');
+        document.getElementById('mainSection').classList.add('hidden');
+    };
+
+    async function checarSessao() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) inicializarApp(session.user);
+    }
+
+    function inicializarApp(user) {
+        usuarioLogado = user;
+        document.getElementById('userBadge').innerText = `👤 Conectado como: ${user.email}`;
+        document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('mainSection').classList.remove('hidden');
+        document.getElementById('dataOcorrencia').valueAsDate = new Date();
+        carregarTurmas();
+    }
+
+    // --- GESTÃO DE TURMAS ---
+    async function carregarTurmas() {
+        const { data, error } = await supabase.from('turmas').select('*').order('created_at', { ascending: true });
+        if (error) return alertToast(error.message, 'error');
+        
+        turmas = data || [];
+        const sel = document.getElementById('selTurma');
+        sel.innerHTML = '';
+
+        if (turmas.length === 0) {
+            sel.innerHTML = '<option value="">Nenhuma turma cadastrada</option>';
+            document.getElementById('selAluno').innerHTML = '<option value="">Cadastre uma turma primeiro</option>';
+            document.getElementById('listaOcorrencias').innerHTML = '<tr><td colspan="17" style="padding:15px;">Cadastre uma turma para começar.</td></tr>';
+            return;
+        }
+
+        turmas.forEach(t => {
+            sel.innerHTML += `<option value="${t.id}">${t.codigo} - ${t.disciplina}</option>`;
+        });
+
+        trocarTurma();
+    }
+
+    window.trocarTurma = async () => {
+        const turmaId = document.getElementById('selTurma').value;
+        if (!turmaId) return;
+        await carregarAlunos(turmaId);
+        await carregarOcorrencias(turmaId);
+    };
+
+    document.getElementById('formTurma').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const codigo = document.getElementById('turmaCodigo').value.trim();
+        const disciplina = document.getElementById('turmaDisciplina').value.trim();
+
+        const { error } = await supabase.from('turmas').insert([{
+            user_id: usuarioLogado.id,
+            codigo,
+            disciplina
+        }]);
+
+        if (error) alertToast(error.message, 'error');
+        else {
+            alertToast('Turma criada!', 'success');
+            fecharModal('modalTurma');
+            e.target.reset();
+            carregarTurmas();
+        }
+    });
+
+    // --- GESTÃO DE ALUNOS ---
+    async function carregarAlunos(turmaId) {
+        const { data, error } = await supabase
+            .from('alunos')
+            .select('*')
+            .eq('turma_id', turmaId)
+            .order('codigo', { ascending: true });
+
+        if (error) return alertToast(error.message, 'error');
+
+        const sel = document.getElementById('selAluno');
+        if (!data || data.length === 0) {
+            sel.innerHTML = '<option value="">Nenhum aluno cadastrado nesta turma</option>';
+            return;
+        }
+
+        sel.innerHTML = '<option value="">Selecione o aluno...</option>';
+        data.forEach(a => {
+            sel.innerHTML += `<option value="${a.id}">[${a.codigo}] ${a.nome_exibicao}</option>`;
+        });
+    }
+
+    document.getElementById('formAluno').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const turmaId = document.getElementById('selTurma').value;
+        if (!turmaId) return alertToast('Selecione uma turma ativa!', 'error');
+
+        const codigo = document.getElementById('alunoCod').value.trim();
+        const nome_exibicao = document.getElementById('alunoExibicao').value.trim();
+        const nome_completo = document.getElementById('alunoCompleto').value.trim();
+
+        // 1. Inserir aluno pseudonimizado
+        const { data: aluno, error: errAluno } = await supabase.from('alunos').insert([{
+            user_id: usuarioLogado.id,
+            turma_id: turmaId,
+            codigo,
+            nome_exibicao
+        }]).select().single();
+
+        if (errAluno) return alertToast(errAluno.message, 'error');
+
+        // 2. Inserir dado real/confidencial na tabela restrita
+        const { error: errIdent } = await supabase.from('alunos_identificacao').insert([{
+            aluno_id: aluno.id,
+            nome_completo
+        }]);
+
+        if (errIdent) alertToast(errIdent.message, 'error');
+        else {
+            alertToast('Aluno cadastrado e protegido via LGPD!', 'success');
+            fecharModal('modalAluno');
+            e.target.reset();
+            carregarAlunos(turmaId);
+        }
+    });
+
+    // --- LANÇAMENTO DE OCORRÊNCIAS (AS 12 NORMAS) ---
+    document.getElementById('formOcorrencia').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const turma_id = document.getElementById('selTurma').value;
+        const aluno_id = document.getElementById('selAluno').value;
+        const data_registro = document.getElementById('dataOcorrencia').value;
+
+        if (!turma_id || !aluno_id) return alertToast('Selecione a turma e o aluno!', 'error');
+
+        const payload = {
+            user_id: usuarioLogado.id,
+            turma_id,
+            aluno_id,
+            data_registro,
+            atraso: document.getElementById('chk_atraso').checked ? 1 : 0,
+            falta: document.getElementById('chk_falta').checked ? 1 : 0,
+            saida_indevida: document.getElementById('chk_saida').checked ? 1 : 0,
+            conversa: document.getElementById('chk_conversa').checked ? 1 : 0,
+            celular: document.getElementById('chk_celular').checked ? 1 : 0,
+            notebook: document.getElementById('chk_notebook').checked ? 1 : 0,
+            alimentacao: document.getElementById('chk_alim').checked ? 1 : 0,
+            nao_realizou: document.getElementById('chk_n_real').checked ? 1 : 0,
+            nao_entregou: document.getElementById('chk_n_entreg').checked ? 1 : 0,
+            dormiu: document.getElementById('chk_dormiu').checked ? 1 : 0,
+            equipamento: document.getElementById('chk_equip').checked ? 1 : 0,
+            desrespeito: document.getElementById('chk_desrespeito').checked ? 1 : 0,
+            observacao: document.getElementById('obsOcorrencia').value.trim() || null
+        };
+
+        const { error } = await supabase.from('ocorrencias').insert([payload]);
+
+        if (error) alertToast(error.message, 'error');
+        else {
+            alertToast('Registro de aula gravado!', 'success');
+            document.querySelectorAll('#formOcorrencia input[type="checkbox"]').forEach(c => c.checked = false);
+            document.getElementById('obsOcorrencia').value = '';
+            carregarOcorrencias(turma_id);
+        }
+    });
+
+    // --- CARREGAR PLANILHA PEDAGÓGICA ---
+    async function carregarOcorrencias(turmaId) {
+        const { data, error } = await supabase
+            .from('ocorrencias')
+            .select(`
+                *,
+                alunos (codigo, nome_exibicao)
+            `)
+            .eq('turma_id', turmaId)
+            .order('data_registro', { ascending: false });
+
+        const tbody = document.getElementById('listaOcorrencias');
+        if (error) return tbody.innerHTML = `<tr><td colspan="17">Erro: ${error.message}</td></tr>`;
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="17" style="color: var(--text-muted); padding: 15px;">Nenhuma ocorrência registrada nesta turma.</td></tr>';
+            return;
+        }
+
+        const renderFlag = (v) => v === 1 ? '<span class="flag-1">1</span>' : '<span class="flag-0">0</span>';
+
+        tbody.innerHTML = data.map(o => `
+            <tr>
+                <td>${o.data_registro.split('-').reverse().slice(0,2).join('/')}</td>
+                <td><span class="badge-aluno">${o.alunos?.codigo || '-'}</span></td>
+                <td class="left">${o.alunos?.nome_exibicao || '-'}</td>
+                <td>${renderFlag(o.atraso)}</td>
+                <td>${renderFlag(o.falta)}</td>
+                <td>${renderFlag(o.saida_indevida)}</td>
+                <td>${renderFlag(o.conversa)}</td>
+                <td>${renderFlag(o.celular)}</td>
+                <td>${renderFlag(o.notebook)}</td>
+                <td>${renderFlag(o.alimentacao)}</td>
+                <td>${renderFlag(o.nao_realizou)}</td>
+                <td>${renderFlag(o.nao_entregou)}</td>
+                <td>${renderFlag(o.dormiu)}</td>
+                <td>${renderFlag(o.equipamento)}</td>
+                <td>${renderFlag(o.desrespeito)}</td>
+                <td class="left" style="font-size: 0.75rem;">${o.observacao || ''}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" onclick="excluirOcorrencia('${o.id}')">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    window.excluirOcorrencia = async (id) => {
+        if (!confirm('Remover este registro?')) return;
+        const { error } = await supabase.from('ocorrencias').delete().eq('id', id);
+        if (error) alertToast(error.message, 'error');
+        else {
+            alertToast('Registro removido!', 'success');
+            trocarTurma();
+        }
+    };
+
+    // --- MODAL & TOASTS ---
+    window.abrirModal = (id) => document.getElementById(id).classList.remove('hidden');
+    window.fecharModal = (id) => document.getElementById(id).classList.add('hidden');
+
+    function alertToast(msg, tipo = 'success') {
+        const toast = document.getElementById('toast');
+        toast.innerText = msg;
+        toast.className = `toast ${tipo}`;
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 3500);
+    }
+
+    checarSessao();
+</script>
+
+</body>
+</html>
